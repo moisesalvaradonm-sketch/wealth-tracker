@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────
+// INSTITUTIONS & ACCOUNTS
+// ─────────────────────────────────────────────
+
+model Institution {
+  id        String          @id @default(uuid())
+  name      String
+  type      InstitutionType
+  logoUrl   String?
+  website   String?
+  accounts  Account[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@map("institutions")
+}
+
+enum InstitutionType {
+  BANK
+  CRYPTO_EXCHANGE
+  BROKERAGE
+  WALLET
+  OTHER
+}
+
+model Account {
+  id                String      @id @default(uuid())
+  institutionId     String?
+  name              String
+  accountType       AccountType
+  isActive          Boolean     @default(true)
+  isManual          Boolean     @default(true)
+  notes             String?
+  color             String?
+  icon              String?
+  includeInNetWorth Boolean     @default(true)
+
+  institution       Institution?        @relation(fields: [institutionId], references: [id])
+  entries           TransactionEntry[]
+  positions         Position[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@map("accounts")
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CASH
+  CRYPTO_WALLET
+  BROKERAGE
+  INVESTMENT
+  CREDIT
+  OTHER
+}
+
+// ─────────────────────────────────────────────
+// ASSETS (types of money / financial instruments)
+// ─────────────────────────────────────────────
+
+model Asset {
+  id             String    @id @default(uuid())
+  symbol         String    @unique
+  name           String
+  assetType      AssetType
+  coingeckoId    String?
+  ticker         String?
+  decimals       Int       @default(2)
+  isStableCoin   Boolean   @default(false)
+  isBaseCurrency Boolean   @default(false)
+
+  prices         AssetPrice[]
+  entries        TransactionEntry[]
+  feeEntries     TransactionEntry[] @relation("FeeAsset")
+  positions      Position[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@map("assets")
+}
+
+enum AssetType {
+  FIAT
+  CRYPTO
+  STOCK
+  ETF
+  BOND
+  FUND
+  OTHER
+}
+
+model AssetPrice {
+  id          String   @id @default(uuid())
+  assetId     String
+  priceUsd    Decimal  @db.Decimal(20, 8)
+  priceSource String   @default("manual")
+  recordedAt  DateTime @default(now())
+
+  asset       Asset    @relation(fields: [assetId], references: [id])
+
+  @@index([assetId, recordedAt(sort: Desc)])
+  @@map("asset_prices")
+}
+
+// ─────────────────────────────────────────────
+// TRANSACTIONS & ENTRIES (ledger)
+// ─────────────────────────────────────────────
+
+model Transaction {
+  id           String            @id @default(uuid())
+  date         DateTime          @db.Date
+  description  String
+  txType       TransactionType
+  status       TransactionStatus @default(CONFIRMED)
+  notes        String?
+  externalId   String?
+  importSource String?
+  duplicateOfId String?
+
+  duplicateOf  Transaction?       @relation("Duplicates", fields: [duplicateOfId], references: [id])
+  duplicates   Transaction[]      @relation("Duplicates")
+  entries      TransactionEntry[]
+  categoryId   String?
+  category     Category?          @relation(fields: [categoryId], references: [id])
+  tags         TransactionTag[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([date(sort: Desc)])
+  @@index([txType])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  EXCHANGE
+  INVESTMENT
+  DIVIDEND
+  INTEREST
+  FEE
+  WITHDRAWAL
+  DEPOSIT
+  ADJUSTMENT
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model TransactionEntry {
+  id             String   @id @default(uuid())
+  transactionId  String
+  accountId      String
+  assetId        String
+  amount         Decimal  @db.Decimal(20, 8)  // negative=outflow, positive=inflow
+  amountUsd      Decimal  @db.Decimal(20, 8)
+  assetPriceUsd  Decimal? @db.Decimal(20, 8)
+  feeAmount      Decimal? @db.Decimal(20, 8)
+  feeAssetId     String?
+  sortOrder      Int      @default(0)
+
+  transaction    Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  account        Account     @relation(fields: [accountId], references: [id])
+  asset          Asset       @relation(fields: [assetId], references: [id])
+  feeAsset       Asset?      @relation("FeeAsset", fields: [feeAssetId], references: [id])
+  createdAt      DateTime    @default(now())
+
+  @@index([accountId])
+  @@index([transactionId])
+  @@map("transaction_entries")
+}
+
+// ─────────────────────────────────────────────
+// CATEGORIES & TAGS
+// ─────────────────────────────────────────────
+
+model Category {
+  id           String     @id @default(uuid())
+  name         String
+  icon         String?
+  color        String?
+  parentId     String?
+  isSystem     Boolean    @default(false)
+
+  parent       Category?  @relation("Subcategories", fields: [parentId], references: [id])
+  children     Category[] @relation("Subcategories")
+  transactions Transaction[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("categories")
+}
+
+model Tag {
+  id           String           @id @default(uuid())
+  name         String           @unique
+  color        String?
+  transactions TransactionTag[]
+  createdAt    DateTime         @default(now())
+
+  @@map("tags")
+}
+
+model TransactionTag {
+  transactionId String
+  tagId         String
+
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  tag           Tag         @relation(fields: [tagId], references: [id])
+
+  @@id([transactionId, tagId])
+  @@map("transaction_tags")
+}
+
+// ─────────────────────────────────────────────
+// POSITIONS (cached — derived from entries)
+// ─────────────────────────────────────────────
+
+model Position {
+  id               String   @id @default(uuid())
+  accountId        String
+  assetId          String
+  quantity         Decimal  @db.Decimal(20, 8)
+  avgCostUsd       Decimal  @db.Decimal(20, 8)
+  currentValueUsd  Decimal? @db.Decimal(20, 8)
+  unrealizedPnlUsd Decimal? @db.Decimal(20, 8)
+  updatedAt        DateTime @updatedAt
+
+  account          Account  @relation(fields: [accountId], references: [id])
+  asset            Asset    @relation(fields: [assetId], references: [id])
+
+  @@unique([accountId, assetId])
+  @@map("positions")
+}
+
+// ─────────────────────────────────────────────
+// NET WORTH SNAPSHOTS
+// ─────────────────────────────────────────────
+
+model NetWorthSnapshot {
+  id           String   @id @default(uuid())
+  date         DateTime @unique @db.Date
+  totalUsd     Decimal  @db.Decimal(20, 8)
+  breakdown    Json
+  newMoneyIn   Decimal  @db.Decimal(20, 8) @default(0)
+  moneyOut     Decimal  @db.Decimal(20, 8) @default(0)
+  marketChange Decimal  @db.Decimal(20, 8) @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([date(sort: Desc)])
+  @@map("net_worth_snapshots")
+}
+
+// ─────────────────────────────────────────────
+// MONTHLY REPORTS (V2)
+// ─────────────────────────────────────────────
+
+model MonthlyReport {
+  id          String              @id @default(uuid())
+  yearMonth   String              @unique  // "2026-09"
+  status      MonthlyReportStatus @default(DRAFT)
+  data        Json
+  pdfUrl      String?
+  generatedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@map("monthly_reports")
+}
+
+enum MonthlyReportStatus {
+  DRAFT
+  PROCESSING
+  FINAL
+}
+
+// ─────────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  action     String
+  oldData    Json?
+  newData    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
