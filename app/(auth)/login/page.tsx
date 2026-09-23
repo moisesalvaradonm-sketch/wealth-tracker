@@ -1,131 +1,120 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
+const KEYS = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const supabase = createClient();
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError("Email o contraseña incorrectos.");
-      setLoading(false);
+  async function handleKey(k: string) {
+    if (loading) return;
+    if (k === "⌫") {
+      setPin((p) => p.slice(0, -1));
+      setError("");
       return;
     }
+    if (!k) return;
+    const next = pin + k;
+    setPin(next);
+    setError("");
 
-    router.push("/dashboard");
-    router.refresh();
+    if (next.length === 4) {
+      setLoading(true);
+      const res = await fetch("/api/auth/pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: next }),
+      });
+      if (res.ok) {
+        router.replace("/dashboard");
+      } else {
+        setError("PIN incorrecto");
+        setPin("");
+        setLoading(false);
+      }
+    }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "var(--bg)" }}>
-      <div className="w-full max-w-sm">
-        {/* Logo / Title */}
-        <div className="text-center mb-8">
-          <h1
-            className="text-2xl font-bold tracking-tight mb-1"
-            style={{ fontFamily: "var(--font-display)", color: "var(--text)" }}
+    <div style={{
+      minHeight: "100svh", background: "var(--bg)",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      padding: "0 32px",
+    }}>
+
+      {/* Logo */}
+      <div style={{ marginBottom: 40, textAlign: "center" }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 20,
+          background: "linear-gradient(135deg, #1e88e5, #42a5f5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 30, margin: "0 auto 16px",
+        }}>
+          💰
+        </div>
+        <h1 style={{ color: "var(--text)", fontSize: 22, fontWeight: 800, margin: 0 }}>
+          Wealth Tracker
+        </h1>
+        <p style={{ color: "var(--muted)", fontSize: 13, margin: "4px 0 0" }}>
+          Ingresa tu PIN de acceso
+        </p>
+      </div>
+
+      {/* PIN dots */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} style={{
+            width: 16, height: 16, borderRadius: "50%",
+            background: i < pin.length
+              ? (error ? "var(--red)" : "var(--blue)")
+              : "var(--surf2)",
+            border: `2px solid ${i < pin.length ? (error ? "var(--red)" : "var(--blue)") : "var(--border)"}`,
+            transition: "all 0.15s",
+          }} />
+        ))}
+      </div>
+
+      {/* Error */}
+      <p style={{
+        color: "var(--red)", fontSize: 13, fontWeight: 600,
+        minHeight: 20, marginBottom: 28,
+        opacity: error ? 1 : 0, transition: "opacity 0.2s",
+      }}>
+        {error || " "}
+      </p>
+
+      {/* Numpad */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 14, width: "100%", maxWidth: 280,
+      }}>
+        {KEYS.map((k, i) => (
+          <button
+            key={i}
+            onPointerDown={(e) => { e.preventDefault(); handleKey(k); }}
+            disabled={!k || loading}
+            style={{
+              height: 68, fontSize: k === "⌫" ? 22 : 26,
+              fontWeight: k === "⌫" ? 400 : 700,
+              background: k ? "var(--surf)" : "transparent",
+              border: k ? "1px solid var(--border)" : "none",
+              borderRadius: 18,
+              color: k ? "var(--text)" : "transparent",
+              cursor: k ? "pointer" : "default",
+              opacity: loading ? 0.5 : 1,
+              fontFamily: k !== "⌫" ? "var(--font-mono)" : "inherit",
+              transition: "background 0.1s",
+            }}
           >
-            Wealth Tracker
-          </h1>
-          <p className="text-sm" style={{ color: "var(--muted)" }}>
-            Tu centro de control financiero
-          </p>
-        </div>
-
-        {/* Card */}
-        <div
-          className="rounded-xl p-6 border"
-          style={{ background: "var(--surf)", borderColor: "var(--border)" }}
-        >
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="email"
-                className="text-sm font-medium"
-                style={{ color: "var(--text)" }}
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="rounded-lg px-3 py-2.5 text-sm border outline-none transition-colors"
-                style={{
-                  background: "var(--surf2)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
-                placeholder="tu@email.com"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label
-                htmlFor="password"
-                className="text-sm font-medium"
-                style={{ color: "var(--text)" }}
-              >
-                Contraseña
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="rounded-lg px-3 py-2.5 text-sm border outline-none"
-                style={{
-                  background: "var(--surf2)",
-                  borderColor: "var(--border)",
-                  color: "var(--text)",
-                }}
-                placeholder="••••••••"
-              />
-            </div>
-
-            {error && (
-              <p
-                className="text-sm rounded-lg px-3 py-2"
-                style={{
-                  color: "var(--red)",
-                  background: "rgba(248,81,73,.08)",
-                }}
-              >
-                {error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-1 rounded-lg py-2.5 text-sm font-semibold transition-opacity disabled:opacity-60"
-              style={{ background: "var(--blue)", color: "#000" }}
-            >
-              {loading ? "Entrando..." : "Entrar"}
-            </button>
-          </form>
-        </div>
+            {k}
+          </button>
+        ))}
       </div>
     </div>
   );

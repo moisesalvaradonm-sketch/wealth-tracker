@@ -39,4 +39,12 @@ body {
 
 * {
   font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, a, [role="button"] {
+  touch-action: manipulation;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
 }
