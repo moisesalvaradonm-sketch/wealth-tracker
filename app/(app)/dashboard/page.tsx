@@ -54,24 +54,24 @@ export default async function DashboardPage() {
         </div>
 
         {/* Quick actions */}
-        <div style={{ display: "flex", gap: 10 }}>
-          <a href="/transactions/new" style={{
-            flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-            gap: 6, padding: "14px 0",
-            background: "#58a6ff",
+        <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+          <a href="/transactions/new/smart" style={{
+            flex: 2, display: "flex", alignItems: "center", justifyContent: "center",
+            gap: 8, padding: "14px 0",
+            background: "linear-gradient(135deg, #1e88e5, #42a5f5)",
             borderRadius: 16, textDecoration: "none",
           }}>
-            <span style={{ fontSize: 18 }}>＋</span>
-            <span style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>Agregar</span>
+            <span style={{ fontSize: 18 }}>🎙️</span>
+            <span style={{ color: "#fff", fontSize: 13, fontWeight: 800 }}>Voz / Foto</span>
           </a>
-          <a href="/transactions" style={{
+          <a href="/transactions/new" style={{
             flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
             gap: 6, padding: "14px 0",
             background: "var(--surf)", border: "1px solid var(--border)",
             borderRadius: 16, textDecoration: "none",
           }}>
-            <span style={{ fontSize: 18 }}>↕</span>
-            <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 700 }}>Actividad</span>
+            <span style={{ fontSize: 18 }}>＋</span>
+            <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 700 }}>Manual</span>
           </a>
           <a href="/accounts" style={{
             flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
