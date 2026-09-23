@@ -2,169 +2,144 @@ export default async function DashboardPage() {
   const displayName = "Moises";
 
   return (
-    <div style={{ background: "var(--bg)", minHeight: "100%" }}>
+    <div style={{ background: "var(--bg)", minHeight: "100%", paddingBottom: 100 }}>
 
-      {/* ── HERO ── */}
-      <div style={{
-        background: "linear-gradient(160deg, #1565c0 0%, #1e88e5 45%, #42a5f5 80%, #81d4fa 100%)",
-        borderRadius: "0 0 32px 32px",
-        padding: "52px 24px 32px",
-        position: "relative",
-        overflow: "hidden",
-      }}>
-        {/* decorative bubbles */}
-        <div style={{ position:"absolute", top:-40, right:-40, width:180, height:180, borderRadius:"50%", background:"rgba(255,255,255,0.07)" }} />
-        <div style={{ position:"absolute", top:20, right:60, width:80, height:80, borderRadius:"50%", background:"rgba(255,255,255,0.05)" }} />
-
-        {/* greeting */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <div style={{
-              width:42, height:42, borderRadius:"50%",
-              background:"rgba(255,255,255,0.25)",
-              display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:17, fontWeight:700, color:"#fff",
-            }}>
-              {displayName.charAt(0)}
-            </div>
-            <div>
-              <p style={{ color:"rgba(255,255,255,0.7)", fontSize:12, margin:0 }}>Bienvenido</p>
-              <p style={{ color:"#fff", fontSize:15, fontWeight:700, margin:0 }}>Hola, {displayName}</p>
-            </div>
+      {/* ── HEADER ── */}
+      <div style={{ padding: "56px 24px 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
+          <div>
+            <p style={{ color: "var(--muted)", fontSize: 13, margin: "0 0 2px", fontWeight: 500 }}>Bienvenido de vuelta</p>
+            <p style={{ color: "var(--text)", fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: "-0.5px" }}>
+              Hola, {displayName} 👋
+            </p>
           </div>
-          <button style={{
-            background:"rgba(255,255,255,0.18)", border:"none",
-            borderRadius:10, padding:"6px 12px", color:"#fff",
-            fontSize:12, fontWeight:600, cursor:"pointer",
+          <div style={{
+            width: 42, height: 42, borderRadius: "50%",
+            background: "linear-gradient(135deg, #1e88e5, #42a5f5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 17, fontWeight: 800, color: "#fff",
           }}>
-            🇺🇸 USD
-          </button>
+            {displayName.charAt(0)}
+          </div>
         </div>
 
-        {/* portfolio total */}
-        <div style={{ marginBottom:24 }}>
-          <p style={{ color:"rgba(255,255,255,0.7)", fontSize:13, margin:"0 0 4px" }}>Mi patrimonio</p>
+        {/* Net worth card */}
+        <div style={{
+          background: "var(--surf)",
+          border: "1px solid var(--border)",
+          borderRadius: 24,
+          padding: "24px 24px 20px",
+          marginBottom: 16,
+          position: "relative",
+          overflow: "hidden",
+        }}>
+          <div style={{
+            position: "absolute", top: -30, right: -30,
+            width: 120, height: 120, borderRadius: "50%",
+            background: "rgba(88,166,255,0.06)",
+          }} />
+          <p style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, margin: "0 0 8px", letterSpacing: 0.5, textTransform: "uppercase" }}>
+            Mi patrimonio
+          </p>
           <p style={{
-            color:"#fff", fontSize:42, fontWeight:800,
-            letterSpacing:"-1.5px", margin:"0 0 8px",
-            fontFamily:"var(--font-display)",
+            color: "var(--text)", fontSize: 44, fontWeight: 800,
+            letterSpacing: "-2px", margin: "0 0 4px",
+            fontFamily: "var(--font-display)",
           }}>
             $0.00
           </p>
-          <span style={{
-            display:"inline-flex", alignItems:"center", gap:4,
-            background:"rgba(255,255,255,0.18)", borderRadius:20,
-            padding:"3px 12px", color:"#fff", fontSize:13, fontWeight:600,
-          }}>
-            ─ Sin datos aún
-          </span>
+          <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
+            Sin datos aún — agrega cuentas para empezar
+          </p>
         </div>
 
-        {/* actions */}
-        <div style={{ display:"flex", gap:12 }}>
+        {/* Quick actions */}
+        <div style={{ display: "flex", gap: 10 }}>
           <a href="/transactions/new" style={{
-            flex:1, display:"flex", alignItems:"center", justifyContent:"center",
-            gap:6, padding:"12px 0",
-            background:"rgba(255,255,255,0.22)", borderRadius:14,
-            color:"#fff", fontSize:14, fontWeight:700,
-            textDecoration:"none",
+            flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 6, padding: "14px 0",
+            background: "#58a6ff",
+            borderRadius: 16, textDecoration: "none",
           }}>
-            + Agregar
+            <span style={{ fontSize: 18 }}>＋</span>
+            <span style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>Agregar</span>
+          </a>
+          <a href="/transactions" style={{
+            flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 6, padding: "14px 0",
+            background: "var(--surf)", border: "1px solid var(--border)",
+            borderRadius: 16, textDecoration: "none",
+          }}>
+            <span style={{ fontSize: 18 }}>↕</span>
+            <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 700 }}>Actividad</span>
           </a>
           <a href="/accounts" style={{
-            flex:1, display:"flex", alignItems:"center", justifyContent:"center",
-            gap:6, padding:"12px 0",
-            background:"rgba(255,255,255,0.22)", borderRadius:14,
-            color:"#fff", fontSize:14, fontWeight:700,
-            textDecoration:"none",
+            flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
+            gap: 6, padding: "14px 0",
+            background: "var(--surf)", border: "1px solid var(--border)",
+            borderRadius: 16, textDecoration: "none",
           }}>
-            🏦 Cuentas
+            <span style={{ fontSize: 18 }}>🏦</span>
+            <span style={{ color: "var(--muted)", fontSize: 12, fontWeight: 700 }}>Cuentas</span>
           </a>
-          <button style={{
-            width:46, height:46,
-            background:"rgba(255,255,255,0.22)", border:"none",
-            borderRadius:14, color:"#fff", fontSize:18, cursor:"pointer",
-          }}>
-            •••
-          </button>
         </div>
       </div>
 
-      {/* ── BODY ── */}
-      <div style={{ padding:"24px 20px 0" }}>
-
-        {/* Investment categories */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
-          <p style={{ color:"var(--text)", fontSize:16, fontWeight:700, margin:0 }}>Mis inversiones</p>
-          <a href="/investments" style={{ color:"var(--blue)", fontSize:13, textDecoration:"none" }}>Ver todo →</a>
+      {/* ── SECCIÓN ACTIVIDAD ── */}
+      <div style={{ padding: "0 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <p style={{ color: "var(--text)", fontSize: 15, fontWeight: 700, margin: 0 }}>Actividad reciente</p>
+          <a href="/transactions" style={{ color: "var(--blue)", fontSize: 13, textDecoration: "none", fontWeight: 600 }}>Ver todo →</a>
         </div>
 
-        <div style={{ display:"flex", gap:12, overflowX:"auto", paddingBottom:8, scrollbarWidth:"none" }}>
+        {/* Empty state */}
+        <div style={{
+          background: "var(--surf)", border: "1px solid var(--border)",
+          borderRadius: 20, padding: "32px 20px", textAlign: "center",
+          marginBottom: 20,
+        }}>
+          <p style={{ fontSize: 28, margin: "0 0 10px" }}>💸</p>
+          <p style={{ color: "var(--text)", fontSize: 14, fontWeight: 700, margin: "0 0 4px" }}>Sin movimientos</p>
+          <p style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 16px" }}>
+            Registra tu primer gasto o ingreso
+          </p>
+          <a href="/transactions/new" style={{
+            display: "inline-block",
+            background: "rgba(88,166,255,0.15)",
+            color: "var(--blue)",
+            borderRadius: 10, padding: "9px 20px",
+            fontSize: 13, fontWeight: 700, textDecoration: "none",
+          }}>
+            + Nueva transacción
+          </a>
+        </div>
+
+        {/* Shortcuts row */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
           {[
-            { label:"Acciones", sub:"Bolsa de valores", icon:"📈" },
-            { label:"Cripto", sub:"Bitcoin, ETH…", icon:"₿" },
-            { label:"Inmuebles", sub:"Propiedades", icon:"🏠" },
-            { label:"Fondos", sub:"ETFs, bonos", icon:"📊" },
-          ].map((cat) => (
-            <div key={cat.label} style={{
-              minWidth:130, flexShrink:0,
-              background:"var(--surf)", border:"1px solid var(--border)",
-              borderRadius:20, padding:"16px 14px", cursor:"pointer",
+            { emoji: "📈", label: "Inversiones", href: "/investments", color: "#bc8cff" },
+            { emoji: "💼", label: "Cuentas", href: "/accounts", color: "#58a6ff" },
+          ].map((item) => (
+            <a key={item.label} href={item.href} style={{
+              display: "flex", alignItems: "center", gap: 12,
+              background: "var(--surf)", border: "1px solid var(--border)",
+              borderRadius: 16, padding: "16px",
+              textDecoration: "none",
             }}>
               <div style={{
-                width:40, height:40, borderRadius:14,
-                background:"var(--surf2)",
-                display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize:20, marginBottom:10,
+                width: 36, height: 36, borderRadius: 10,
+                background: `${item.color}18`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 18,
               }}>
-                {cat.icon}
+                {item.emoji}
               </div>
-              <p style={{ color:"var(--text)", fontSize:13, fontWeight:700, margin:"0 0 2px" }}>{cat.label}</p>
-              <p style={{ color:"var(--muted)", fontSize:11, margin:"0 0 8px" }}>{cat.sub}</p>
-              <p style={{ color:"var(--muted)", fontSize:15, fontWeight:700, margin:0 }}>$0.00</p>
-            </div>
+              <span style={{ color: "var(--text)", fontSize: 14, fontWeight: 700 }}>{item.label}</span>
+            </a>
           ))}
         </div>
-
-        {/* Setup CTA */}
-        <div style={{
-          marginTop:24,
-          background:"var(--surf)", border:"1px solid var(--border)",
-          borderRadius:22, padding:"24px 20px", textAlign:"center",
-        }}>
-          <p style={{ fontSize:32, margin:"0 0 8px" }}>🚀</p>
-          <p style={{ color:"var(--text)", fontSize:15, fontWeight:700, margin:"0 0 6px" }}>Conecta tus cuentas</p>
-          <p style={{ color:"var(--muted)", fontSize:13, margin:"0 0 18px", lineHeight:1.5 }}>
-            Agrega tus bancos, wallets y broker para ver todo en un solo lugar.
-          </p>
-          <a href="/accounts" style={{
-            display:"inline-block",
-            background:"linear-gradient(135deg, #1e88e5, #42a5f5)",
-            color:"#fff", borderRadius:14,
-            padding:"12px 32px", fontSize:14, fontWeight:700,
-            textDecoration:"none",
-          }}>
-            Agregar primera cuenta
-          </a>
-        </div>
-
-        {/* Recent activity */}
-        <div style={{ marginTop:24, marginBottom:8 }}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-            <p style={{ color:"var(--text)", fontSize:16, fontWeight:700, margin:0 }}>Actividad reciente</p>
-            <a href="/transactions" style={{ color:"var(--blue)", fontSize:13, textDecoration:"none" }}>Ver todo →</a>
-          </div>
-          <div style={{
-            background:"var(--surf)", border:"1px solid var(--border)",
-            borderRadius:18, padding:"28px 20px", textAlign:"center",
-          }}>
-            <p style={{ color:"var(--muted)", fontSize:13, margin:0 }}>
-              Tus movimientos aparecerán aquí
-            </p>
-          </div>
-        </div>
-
       </div>
+
     </div>
   );
 }
