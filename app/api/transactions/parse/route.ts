@@ -1,6 +1,44 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 
+type TxType = "EXPENSE" | "INCOME" | "TRANSFER" | "INVESTMENT";
+interface ParseResult {
+  txType: TxType; amount: number; description: string; categoryName: string;
+  merchant: string | null; date: string; notes: string | null; confidence: "high" | "medium" | "low";
+}
+
+function parseLocally(text: string, today: string): ParseResult {
+  const lower = text.toLowerCase();
+  let txType: TxType = "EXPENSE";
+  if (/recib[íi]|ingres[óo]|me pagar|cobr[éeó]|deposit[óo]|gan[éeó]|salario|sueldo/.test(lower)) txType = "INCOME";
+  else if (/invert[íi]|compr[éeó]\s*(acciones|cripto|btc|eth)|bolsa/.test(lower)) txType = "INVESTMENT";
+  else if (/transfer[íi]|pas[éeó]|mov[íi]\s*(plata|dinero)|envié/.test(lower)) txType = "TRANSFER";
+  const amountMatch = text.match(/\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:[.,]\d{1,2})?)/);
+  let amount = 0;
+  if (amountMatch) amount = parseFloat(amountMatch[1].replace(/,(?=\d{3})/g, "").replace(",", ".")) || 0;
+  let date = today;
+  if (/\bayer\b/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() - 1); date = d.toISOString().split("T")[0]; }
+  else if (/semana pasada|hace una semana/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() - 7); date = d.toISOString().split("T")[0]; }
+  const catRules: [RegExp, string][] = [
+    [/super\s*99|riba smith|el rey|machetazo|supermercado|walmart|pricemart/, "Alimentación"],
+    [/restauran|pizz|burger|kfc|mcdonald|subway|almuerzo|cena|desayuno|café/, "Restaurantes"],
+    [/gasolina|combustible|terpel|delta|puma/, "Gasolina"],
+    [/uber|taxi|bus|metro|didi|transporte/, "Transporte"],
+    [/farmacia|doctor|clínica|hospital|salud|médico/, "Salud"],
+    [/netflix|spotify|amazon prime|disney|suscripci/, "Suscripciones"],
+    [/luz|agua|internet|cable onda|claro|tigo|movistar/, "Servicios"],
+    [/ropa|camisa|zapato|zara|h&m/, "Ropa"],
+    [/salario|sueldo|quincena|nómina/, "Salario"],
+    [/consultor|honorario|proyecto|freelance/, "Consultoría"],
+  ];
+  let categoryName = "Otro";
+  for (const [re, cat] of catRules) { if (re.test(lower)) { categoryName = cat; break; } }
+  const description = text.replace(/\$?\s*\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+(?:[.,]\d{1,2})?/g, "")
+    .replace(/\b(gasté|compré|pagué|recibí|invertí|fui a|en el|en la|al|del|hoy|ayer|un|una|el|la)\b/gi, " ")
+    .replace(/\s+/g, " ").trim().slice(0, 60) || categoryName;
+  return { txType, amount, description, categoryName, merchant: null, date, notes: null, confidence: amount > 0 ? "medium" : "low" };
+}
+
 const SYSTEM = `Eres un asistente financiero personal. Extraes datos de transacciones a partir de texto hablado o imágenes de recibos/facturas.
 
 Responde SOLO con un JSON válido con esta estructura:
@@ -28,11 +66,6 @@ Reglas:
 
 export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY no configurada" }, { status: 503 });
-  }
-
-  const client = new Anthropic({ apiKey });
   const today = new Date().toISOString().split("T")[0];
 
   let body: { type: "text" | "image"; content?: string; base64?: string; mimeType?: string };
@@ -44,6 +77,17 @@ export async function POST(req: Request) {
 
   const { type } = body;
 
+  // No API key → local parsing for text, error for images
+  if (!apiKey) {
+    if (type === "text") {
+      const { content } = body;
+      if (!content?.trim()) return NextResponse.json({ error: "Texto vacío" }, { status: 400 });
+      return NextResponse.json(parseLocally(content, today));
+    }
+    return NextResponse.json({ error: "Se necesita ANTHROPIC_API_KEY para analizar imágenes" }, { status: 503 });
+  }
+
+  const client = new Anthropic({ apiKey });
   try {
     let message;
 

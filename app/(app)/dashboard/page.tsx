@@ -1,5 +1,40 @@
+import { prisma } from "@/lib/prisma";
+
+function fmt(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
+}
+
+const TYPE_COLOR: Record<string, string> = {
+  EXPENSE: "var(--red)", INCOME: "var(--green)",
+  INVESTMENT: "var(--purple)", TRANSFER: "var(--muted)",
+  DIVIDEND: "var(--green)", FEE: "var(--red)",
+};
+const TYPE_LABEL: Record<string, string> = {
+  EXPENSE: "Gasto", INCOME: "Ingreso", INVESTMENT: "Inversión",
+  TRANSFER: "Transferencia", DIVIDEND: "Dividendo", FEE: "Comisión",
+};
+
 export default async function DashboardPage() {
   const displayName = "Moises";
+
+  const [netWorthAgg, recentTx, accountCount] = await Promise.all([
+    prisma.transactionEntry.aggregate({
+      where: { account: { includeInNetWorth: true, isActive: true } },
+      _sum: { amountUsd: true },
+    }),
+    prisma.transaction.findMany({
+      take: 5,
+      orderBy: { date: "desc" },
+      include: {
+        entries: { include: { account: { select: { name: true } } }, take: 1 },
+        category: { select: { name: true } },
+      },
+    }),
+    prisma.account.count({ where: { isActive: true } }),
+  ]);
+
+  const netWorth = Number(netWorthAgg._sum.amountUsd ?? 0);
+  const hasData = recentTx.length > 0;
 
   return (
     <div style={{ background: "var(--bg)", minHeight: "100%", paddingBottom: 100 }}>
@@ -42,14 +77,14 @@ export default async function DashboardPage() {
             Mi patrimonio
           </p>
           <p style={{
-            color: "var(--text)", fontSize: 44, fontWeight: 800,
+            color: netWorth < 0 ? "var(--red)" : "var(--text)", fontSize: 44, fontWeight: 800,
             letterSpacing: "-2px", margin: "0 0 4px",
             fontFamily: "var(--font-display)",
           }}>
-            $0.00
+            {fmt(netWorth)}
           </p>
           <p style={{ color: "var(--muted)", fontSize: 13, margin: 0 }}>
-            Sin datos aún — agrega cuentas para empezar
+            {accountCount === 0 ? "Sin cuentas aún — agrega una para empezar" : `${accountCount} cuenta${accountCount !== 1 ? "s" : ""} activa${accountCount !== 1 ? "s" : ""}`}
           </p>
         </div>
 
@@ -92,27 +127,62 @@ export default async function DashboardPage() {
           <a href="/transactions" style={{ color: "var(--blue)", fontSize: 13, textDecoration: "none", fontWeight: 600 }}>Ver todo →</a>
         </div>
 
-        {/* Empty state */}
-        <div style={{
-          background: "var(--surf)", border: "1px solid var(--border)",
-          borderRadius: 20, padding: "32px 20px", textAlign: "center",
-          marginBottom: 20,
-        }}>
-          <p style={{ fontSize: 28, margin: "0 0 10px" }}>💸</p>
-          <p style={{ color: "var(--text)", fontSize: 14, fontWeight: 700, margin: "0 0 4px" }}>Sin movimientos</p>
-          <p style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 16px" }}>
-            Registra tu primer gasto o ingreso
-          </p>
-          <a href="/transactions/new" style={{
-            display: "inline-block",
-            background: "rgba(88,166,255,0.15)",
-            color: "var(--blue)",
-            borderRadius: 10, padding: "9px 20px",
-            fontSize: 13, fontWeight: 700, textDecoration: "none",
+        {!hasData ? (
+          <div style={{
+            background: "var(--surf)", border: "1px solid var(--border)",
+            borderRadius: 20, padding: "32px 20px", textAlign: "center", marginBottom: 20,
           }}>
-            + Nueva transacción
-          </a>
-        </div>
+            <p style={{ fontSize: 28, margin: "0 0 10px" }}>💸</p>
+            <p style={{ color: "var(--text)", fontSize: 14, fontWeight: 700, margin: "0 0 4px" }}>Sin movimientos</p>
+            <p style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 16px" }}>Registra tu primer gasto o ingreso</p>
+            <a href="/transactions/new" style={{
+              display: "inline-block", background: "rgba(88,166,255,0.15)",
+              color: "var(--blue)", borderRadius: 10, padding: "9px 20px",
+              fontSize: 13, fontWeight: 700, textDecoration: "none",
+            }}>+ Nueva transacción</a>
+          </div>
+        ) : (
+          <div style={{
+            background: "var(--surf)", border: "1px solid var(--border)",
+            borderRadius: 20, overflow: "hidden", marginBottom: 20,
+          }}>
+            {recentTx.map((tx, i) => {
+              const entry = tx.entries[0];
+              const amount = entry ? Number(entry.amount) : 0;
+              const color = TYPE_COLOR[tx.txType] ?? "var(--muted)";
+              const isLast = i === recentTx.length - 1;
+              const dateStr = new Date(tx.date).toLocaleDateString("es-PA", { month: "short", day: "numeric" });
+              return (
+                <a key={tx.id} href={`/transactions/${tx.id}`} style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "13px 16px",
+                  borderBottom: isLast ? "none" : "1px solid var(--border)",
+                  textDecoration: "none",
+                }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                    background: `${color}18`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 15,
+                  }}>
+                    {tx.txType === "INCOME" ? "💰" : tx.txType === "INVESTMENT" ? "📈" : tx.txType === "TRANSFER" ? "↔️" : "💸"}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ color: "var(--text)", fontSize: 13, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {tx.description}
+                    </p>
+                    <p style={{ color: "var(--muted)", fontSize: 11, margin: 0 }}>
+                      {dateStr} · {tx.category?.name ?? TYPE_LABEL[tx.txType] ?? tx.txType}
+                    </p>
+                  </div>
+                  <p style={{ color, fontSize: 14, fontWeight: 700, margin: 0, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                    {amount >= 0 ? "+" : ""}{fmt(amount)}
+                  </p>
+                </a>
+              );
+            })}
+          </div>
+        )}
 
         {/* Shortcuts row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
