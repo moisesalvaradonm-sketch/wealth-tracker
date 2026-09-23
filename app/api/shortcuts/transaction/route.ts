@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { TransactionType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 // iOS Shortcuts sends a POST with a shared secret + transaction data
@@ -81,10 +82,10 @@ export async function POST(req: Request) {
     data: {
       date: date ? new Date(date) : new Date(),
       description: String(description),
-      txType,
+      txType: txType as TransactionType,
       categoryId,
       entries: {
-        create: [{ accountId: account.id, assetId: asset.id, amount: entryAmount }],
+        create: [{ accountId: account.id, assetId: asset.id, amount: entryAmount, amountUsd: entryAmount }],
       },
     },
     include: {

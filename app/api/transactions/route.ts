@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { TransactionType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 // Ensure a USD asset exists, return its id
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
     data: {
       date: date ? new Date(date) : new Date(),
       description,
-      txType,
+      txType: txType as TransactionType,
       categoryId,
       entries: {
         create: [
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
             accountId,
             assetId: asset.id,
             amount: entryAmount,
+            amountUsd: entryAmount,
           },
         ],
       },
