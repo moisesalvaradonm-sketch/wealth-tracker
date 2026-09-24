@@ -9,7 +9,16 @@ export async function GET() {
     orderBy: { createdAt: "asc" },
   });
 
-  return NextResponse.json(accounts);
+  // Attach balance (sum of all entry amounts) to each account
+  const balances = await prisma.transactionEntry.groupBy({
+    by: ["accountId"],
+    _sum: { amountUsd: true },
+  });
+  const balanceMap = Object.fromEntries(balances.map((b) => [b.accountId, Number(b._sum.amountUsd ?? 0)]));
+
+  const result = accounts.map((a) => ({ ...a, balance: balanceMap[a.id] ?? 0 }));
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: Request) {

@@ -20,6 +20,7 @@ interface Account {
   accountType: string;
   color?: string;
   icon?: string;
+  balance?: number;
 }
 
 export default function AccountsPage() {
@@ -128,7 +129,13 @@ export default function AccountsPage() {
                 <p style={{ color: "var(--text)", fontSize: 15, fontWeight: 700, margin: 0 }}>{acc.name}</p>
                 <p style={{ color: "var(--muted)", fontSize: 12, margin: "2px 0 0" }}>{info?.label}</p>
               </div>
-              <p style={{ color: "var(--text)", fontSize: 16, fontWeight: 800, margin: 0 }}>$0.00</p>
+              <p style={{
+                color: (acc.balance ?? 0) < 0 ? "var(--red)" : "var(--text)",
+                fontSize: 16, fontWeight: 800, margin: 0,
+                fontFamily: "var(--font-mono)",
+              }}>
+                {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(acc.balance ?? 0)}
+              </p>
             </div>
           );
         })}

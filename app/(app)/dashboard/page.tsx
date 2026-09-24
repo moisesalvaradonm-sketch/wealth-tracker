@@ -153,11 +153,10 @@ export default async function DashboardPage() {
               const isLast = i === recentTx.length - 1;
               const dateStr = new Date(tx.date).toLocaleDateString("es-PA", { month: "short", day: "numeric" });
               return (
-                <a key={tx.id} href={`/transactions/${tx.id}`} style={{
+                <div key={tx.id} style={{
                   display: "flex", alignItems: "center", gap: 12,
                   padding: "13px 16px",
                   borderBottom: isLast ? "none" : "1px solid var(--border)",
-                  textDecoration: "none",
                 }}>
                   <div style={{
                     width: 36, height: 36, borderRadius: 10, flexShrink: 0,
@@ -178,7 +177,7 @@ export default async function DashboardPage() {
                   <p style={{ color, fontSize: 14, fontWeight: 700, margin: 0, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
                     {amount >= 0 ? "+" : ""}{fmt(amount)}
                   </p>
-                </a>
+                </div>
               );
             })}
           </div>
@@ -187,7 +186,7 @@ export default async function DashboardPage() {
         {/* Shortcuts row */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
           {[
-            { emoji: "📈", label: "Inversiones", href: "/investments", color: "#bc8cff" },
+            { emoji: "📈", label: "Inversiones", href: "/transactions", color: "#bc8cff" },
             { emoji: "💼", label: "Cuentas", href: "/accounts", color: "#58a6ff" },
           ].map((item) => (
             <a key={item.label} href={item.href} style={{
