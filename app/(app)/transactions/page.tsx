@@ -129,10 +129,11 @@ export default function TransactionsPage() {
               const cfg = TYPE_CONFIG[tx.txType] ?? { label: tx.txType, color: "var(--muted)", emoji: "•" };
               const amt = formatAmount(tx);
               return (
-                <div key={tx.id} style={{
+                <a key={tx.id} href={`/transactions/${tx.id}`} style={{
                   display: "flex", alignItems: "center", gap: 12,
                   padding: "14px 16px",
                   borderTop: i > 0 ? "1px solid var(--border)" : "none",
+                  textDecoration: "none",
                 }}>
                   {/* Icon */}
                   <div style={{
@@ -166,7 +167,7 @@ export default function TransactionsPage() {
                   }}>
                     {typeof amt === "object" ? amt.text : amt}
                   </p>
-                </div>
+                </a>
               );
             })}
           </div>

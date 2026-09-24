@@ -1,7 +1,20 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 type TxType = "EXPENSE" | "INCOME" | "TRANSFER" | "INVESTMENT";
+
+const ParseResultSchema = z.object({
+  txType: z.enum(["EXPENSE", "INCOME", "TRANSFER", "INVESTMENT"]),
+  amount: z.number().positive(),
+  description: z.string().min(1).max(120),
+  categoryName: z.string().min(1).max(80),
+  merchant: z.string().nullable(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  notes: z.string().nullable(),
+  confidence: z.enum(["high", "medium", "low"]),
+});
+
 interface ParseResult {
   txType: TxType; amount: number; description: string; categoryName: string;
   merchant: string | null; date: string; notes: string | null; confidence: "high" | "medium" | "low";
@@ -126,9 +139,22 @@ export async function POST(req: Request) {
     const raw = message.content[0].type === "text" ? message.content[0].text : "";
     // Strip markdown code fences if present
     const clean = raw.replace(/```(?:json)?\n?/g, "").trim();
-    const parsed = JSON.parse(clean);
+    const rawParsed = JSON.parse(clean);
 
-    return NextResponse.json(parsed);
+    // Validate and sanitize with Zod
+    const result = ParseResultSchema.safeParse(rawParsed);
+    if (!result.success) {
+      // Attempt to recover: coerce amount to number if string
+      if (typeof rawParsed.amount === "string") {
+        rawParsed.amount = parseFloat(rawParsed.amount.replace(/[^0-9.]/g, "")) || 0;
+      }
+      const retry = ParseResultSchema.safeParse(rawParsed);
+      if (!retry.success) {
+        return NextResponse.json({ error: "Respuesta de IA inválida, intenta de nuevo" }, { status: 422 });
+      }
+      return NextResponse.json(retry.data);
+    }
+    return NextResponse.json(result.data);
   } catch (err) {
     console.error("Parse error:", err);
     return NextResponse.json({ error: "No pude entender la transacción" }, { status: 422 });

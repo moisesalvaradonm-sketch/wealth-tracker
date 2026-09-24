@@ -28,12 +28,15 @@ export default function AccountsPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [adjustAccount, setAdjustAccount] = useState<Account | null>(null);
+  const [adjustAmount, setAdjustAmount] = useState("");
 
   const [form, setForm] = useState({
     name: "",
     accountType: "CHECKING",
     color: COLORS[0],
     notes: "",
+    initialBalance: "",
   });
 
   useEffect(() => {
@@ -48,14 +51,62 @@ export default function AccountsPage() {
     const res = await fetch("/api/accounts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ name: form.name, accountType: form.accountType, color: form.color, notes: form.notes }),
     });
     if (res.ok) {
       const acc = await res.json();
+
+      // Create initial balance transaction if provided
+      const initialBalance = parseFloat(form.initialBalance);
+      if (!isNaN(initialBalance) && initialBalance > 0) {
+        await fetch("/api/transactions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            txType: "DEPOSIT",
+            amount: String(initialBalance),
+            accountId: acc.id,
+            description: "Saldo inicial",
+            categoryName: "Saldo inicial",
+            date: new Date().toISOString().split("T")[0],
+          }),
+        });
+        acc.balance = initialBalance;
+      }
+
       setAccounts((prev) => [...prev, acc]);
       setShowForm(false);
-      setForm({ name: "", accountType: "CHECKING", color: COLORS[0], notes: "" });
+      setForm({ name: "", accountType: "CHECKING", color: COLORS[0], notes: "", initialBalance: "" });
     }
+    setSaving(false);
+  }
+
+  async function handleAdjust() {
+    if (!adjustAccount) return;
+    const target = parseFloat(adjustAmount);
+    if (isNaN(target)) return;
+    setSaving(true);
+    const current = adjustAccount.balance ?? 0;
+    const diff = target - current;
+    if (diff !== 0) {
+      await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          txType: diff > 0 ? "DEPOSIT" : "EXPENSE",
+          amount: String(Math.abs(diff)),
+          accountId: adjustAccount.id,
+          description: "Ajuste de saldo",
+          categoryName: "Ajuste de saldo",
+          date: new Date().toISOString().split("T")[0],
+        }),
+      });
+    }
+    // Refresh accounts
+    const r = await fetch("/api/accounts");
+    setAccounts(await r.json());
+    setAdjustAccount(null);
+    setAdjustAmount("");
     setSaving(false);
   }
 
@@ -129,17 +180,80 @@ export default function AccountsPage() {
                 <p style={{ color: "var(--text)", fontSize: 15, fontWeight: 700, margin: 0 }}>{acc.name}</p>
                 <p style={{ color: "var(--muted)", fontSize: 12, margin: "2px 0 0" }}>{info?.label}</p>
               </div>
-              <p style={{
-                color: (acc.balance ?? 0) < 0 ? "var(--red)" : "var(--text)",
-                fontSize: 16, fontWeight: 800, margin: 0,
-                fontFamily: "var(--font-mono)",
-              }}>
-                {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(acc.balance ?? 0)}
-              </p>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                <p style={{
+                  color: (acc.balance ?? 0) < 0 ? "var(--red)" : "var(--text)",
+                  fontSize: 16, fontWeight: 800, margin: 0,
+                  fontFamily: "var(--font-mono)",
+                }}>
+                  {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(acc.balance ?? 0)}
+                </p>
+                <button
+                  onClick={() => { setAdjustAccount(acc); setAdjustAmount(String(acc.balance ?? 0)); }}
+                  style={{
+                    background: "none", border: "none",
+                    color: "var(--muted)", fontSize: 11, cursor: "pointer",
+                    padding: 0, fontWeight: 600,
+                  }}
+                >
+                  Ajustar
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
+
+      {/* Adjust balance sheet */}
+      {adjustAccount && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+          display: "flex", alignItems: "flex-end", zIndex: 50,
+        }}>
+          <div style={{
+            background: "var(--surf)", borderRadius: "24px 24px 0 0",
+            padding: "24px 20px 36px", width: "100%", maxWidth: 430, margin: "0 auto",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <h3 style={{ color: "var(--text)", fontSize: 17, fontWeight: 800, margin: 0 }}>Ajustar saldo</h3>
+              <button onClick={() => setAdjustAccount(null)} style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 22, cursor: "pointer" }}>✕</button>
+            </div>
+            <p style={{ color: "var(--muted)", fontSize: 13, margin: "0 0 16px" }}>{adjustAccount.name}</p>
+            <label style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Nuevo saldo actual (USD)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={adjustAmount}
+              onChange={(e) => setAdjustAmount(e.target.value)}
+              placeholder="0.00"
+              style={{
+                width: "100%", marginTop: 6, marginBottom: 20,
+                background: "var(--surf2)", border: "1px solid var(--border)",
+                borderRadius: 12, padding: "13px 14px",
+                color: "var(--text)", fontSize: 18, fontWeight: 700, outline: "none",
+                boxSizing: "border-box", textAlign: "right",
+                fontFamily: "var(--font-mono)",
+              }}
+            />
+            <p style={{ color: "var(--muted)", fontSize: 12, margin: "0 0 20px" }}>
+              Se creará una transacción de ajuste por la diferencia.
+            </p>
+            <button
+              onClick={handleAdjust}
+              disabled={saving || adjustAmount === ""}
+              style={{
+                width: "100%", padding: "14px 0",
+                background: "linear-gradient(135deg, #1e88e5, #42a5f5)",
+                color: "#fff", border: "none", borderRadius: 16,
+                fontSize: 16, fontWeight: 800, cursor: "pointer",
+                opacity: saving || adjustAmount === "" ? 0.6 : 1,
+              }}
+            >
+              {saving ? "Guardando…" : "Confirmar ajuste"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Create form */}
       {showForm && (
@@ -192,6 +306,24 @@ export default function AccountsPage() {
                 </button>
               ))}
             </div>
+
+            {/* Initial balance */}
+            <label style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Saldo inicial (USD)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.initialBalance}
+              onChange={(e) => setForm((f) => ({ ...f, initialBalance: e.target.value }))}
+              placeholder="0.00  (opcional)"
+              style={{
+                width: "100%", marginTop: 6, marginBottom: 16,
+                background: "var(--surf2)", border: "1px solid var(--border)",
+                borderRadius: 12, padding: "12px 14px",
+                color: "var(--text)", fontSize: 15, outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
 
             {/* Color */}
             <label style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Color</label>

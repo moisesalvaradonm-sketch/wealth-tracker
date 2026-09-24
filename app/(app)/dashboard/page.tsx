@@ -153,10 +153,11 @@ export default async function DashboardPage() {
               const isLast = i === recentTx.length - 1;
               const dateStr = new Date(tx.date).toLocaleDateString("es-PA", { month: "short", day: "numeric" });
               return (
-                <div key={tx.id} style={{
+                <a key={tx.id} href={`/transactions/${tx.id}`} style={{
                   display: "flex", alignItems: "center", gap: 12,
                   padding: "13px 16px",
                   borderBottom: isLast ? "none" : "1px solid var(--border)",
+                  textDecoration: "none",
                 }}>
                   <div style={{
                     width: 36, height: 36, borderRadius: 10, flexShrink: 0,
@@ -177,7 +178,7 @@ export default async function DashboardPage() {
                   <p style={{ color, fontSize: 14, fontWeight: 700, margin: 0, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
                     {amount >= 0 ? "+" : ""}{fmt(amount)}
                   </p>
-                </div>
+                </a>
               );
             })}
           </div>

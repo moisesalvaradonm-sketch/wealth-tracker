@@ -50,6 +50,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `No encontré monto en: "${text}"` }, { status: 422 });
   }
 
+  // Duplicate check: same amount in last 3 minutes
+  const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
+  const existingEntry = await prisma.transactionEntry.findFirst({
+    where: {
+      amountUsd: -amount,
+      createdAt: { gte: threeMinutesAgo },
+    },
+    include: { transaction: true },
+  });
+  if (existingEntry) {
+    return NextResponse.json({
+      ok: true,
+      duplicate: true,
+      message: `⚠️ Duplicado detectado — $${amount.toFixed(2)} ya registrado`,
+      id: existingEntry.transaction.id,
+    });
+  }
+
   const account = await prisma.account.findFirst({
     where: { isActive: true },
     orderBy: { createdAt: "asc" },
