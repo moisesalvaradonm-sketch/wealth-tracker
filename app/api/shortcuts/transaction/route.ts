@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     categoryName?: string;
     date?: string;
     externalRef?: string;
+    entityName?: string; // "Personal" | "MR Global Partners"
   };
 
   try {
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { amount, description, txType = "EXPENSE", accountName, toAccountName, categoryName, date, externalRef } = body;
+  const { amount, description, txType = "EXPENSE", accountName, toAccountName, categoryName, date, externalRef, entityName } = body;
 
   if (!amount || !description) {
     return NextResponse.json({ error: "amount y description son requeridos" }, { status: 400 });
@@ -56,12 +57,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Monto inválido" }, { status: 400 });
   }
 
+  // Resolve entity filter if provided
+  let entityId: string | undefined;
+  if (entityName) {
+    const entity = await prisma.entity.findFirst({ where: { name: { contains: entityName, mode: "insensitive" } } });
+    entityId = entity?.id;
+  }
+
   let account = accountName
-    ? await prisma.account.findFirst({ where: { name: { contains: accountName, mode: "insensitive" }, isActive: true } })
+    ? await prisma.account.findFirst({
+        where: { name: { contains: accountName, mode: "insensitive" }, isActive: true, ...(entityId ? { entityId } : {}) },
+      })
     : null;
   if (!account) {
     account = await prisma.account.findFirst({
-      where: { isActive: true, accountRole: { not: "VIRTUAL" } },
+      where: { isActive: true, accountRole: { not: "VIRTUAL" }, ...(entityId ? { entityId } : {}) },
       orderBy: { createdAt: "asc" },
     });
   }

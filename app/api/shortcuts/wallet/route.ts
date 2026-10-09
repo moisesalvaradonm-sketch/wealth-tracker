@@ -29,14 +29,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { text?: string };
+  let body: { text?: string; accountName?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { text } = body;
+  const { text, accountName } = body;
   if (!text?.trim()) {
     return NextResponse.json({ error: "Texto vacío" }, { status: 400 });
   }
@@ -63,10 +63,17 @@ export async function POST(req: Request) {
     });
   }
 
-  const account = await prisma.account.findFirst({
-    where: { isActive: true, includeInNetWorth: true, accountRole: { not: "VIRTUAL" } },
-    orderBy: { createdAt: "asc" },
-  });
+  let account = accountName
+    ? await prisma.account.findFirst({
+        where: { name: { contains: accountName, mode: "insensitive" }, isActive: true, accountRole: { not: "VIRTUAL" } },
+      })
+    : null;
+  if (!account) {
+    account = await prisma.account.findFirst({
+      where: { isActive: true, includeInNetWorth: true, accountRole: { not: "VIRTUAL" } },
+      orderBy: { createdAt: "asc" },
+    });
+  }
   if (!account) {
     return NextResponse.json({ error: "Crea una cuenta primero en el app" }, { status: 422 });
   }
