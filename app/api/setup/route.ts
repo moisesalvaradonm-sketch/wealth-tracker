@@ -57,29 +57,17 @@ export async function POST(req: Request) {
     });
   }
 
-  const sysIncome = await prisma.account.upsert({
-    where: { name: INCOME_NAME } as { name: string },
-    update: {},
-    create: {
-      name: INCOME_NAME,
-      accountType: "OTHER",
-      accountRole: "VIRTUAL",
-      includeInNetWorth: false,
-      isManual: false,
-    },
-  });
+  const sysIncome =
+    (await prisma.account.findFirst({ where: { name: INCOME_NAME } })) ??
+    (await prisma.account.create({
+      data: { name: INCOME_NAME, accountType: "OTHER", accountRole: "VIRTUAL", includeInNetWorth: false, isManual: false },
+    }));
 
-  const sysExpense = await prisma.account.upsert({
-    where: { name: EXPENSE_NAME } as { name: string },
-    update: {},
-    create: {
-      name: EXPENSE_NAME,
-      accountType: "OTHER",
-      accountRole: "VIRTUAL",
-      includeInNetWorth: false,
-      isManual: false,
-    },
-  });
+  const sysExpense =
+    (await prisma.account.findFirst({ where: { name: EXPENSE_NAME } })) ??
+    (await prisma.account.create({
+      data: { name: EXPENSE_NAME, accountType: "OTHER", accountRole: "VIRTUAL", includeInNetWorth: false, isManual: false },
+    }));
 
   log.push(`Cuentas sistema: ${sysIncome.name}, ${sysExpense.name}`);
 

@@ -3,6 +3,35 @@
 import { useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
+// Browser Speech API — not in TypeScript's DOM lib by default
+declare class SpeechRecognition extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+  onresult: ((e: SpeechRecognition) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+declare interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+declare interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+declare interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
 type TxType = "EXPENSE" | "INCOME" | "TRANSFER" | "INVESTMENT";
 
 interface ParsedTx {
@@ -107,7 +136,7 @@ export default function SmartTransactionPage() {
     rec.interimResults = true;
 
     let finalText = "";
-    rec.onresult = (e: SpeechRecognitionEvent) => {
+    rec.onresult = (e: SpeechRecognition) => {
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
