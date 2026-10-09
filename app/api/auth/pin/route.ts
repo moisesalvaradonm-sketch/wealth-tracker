@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
+import { createSessionToken, COOKIE_NAME } from "@/lib/session";
+import { checkRateLimit, clearRateLimit } from "@/lib/ratelimit";
 
 export async function POST(req: Request) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: "Demasiados intentos. Espera un minuto." },
+      { status: 429 }
+    );
+  }
+
   const { pin } = await req.json();
   const correctPin = process.env.APP_PIN;
 
@@ -12,16 +23,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "PIN incorrecto" }, { status: 401 });
   }
 
-  const secret = process.env.APP_SESSION_SECRET ?? "default-secret";
-  // Simple token: base64(secret + timestamp)
-  const token = Buffer.from(`${secret}:${Date.now()}`).toString("base64");
+  clearRateLimit(ip); // reset counter on success
+
+  let token: string;
+  try {
+    token = createSessionToken();
+  } catch {
+    return NextResponse.json(
+      { error: "APP_SESSION_SECRET no configurado" },
+      { status: 503 }
+    );
+  }
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("wt_session", token, {
+  res.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 días
+    maxAge: 60 * 60 * 24 * 30,
     secure: process.env.NODE_ENV === "production",
   });
   return res;
@@ -29,6 +48,6 @@ export async function POST(req: Request) {
 
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.delete("wt_session");
+  res.cookies.delete(COOKIE_NAME);
   return res;
 }

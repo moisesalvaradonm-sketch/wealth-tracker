@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { writeAudit } from "@/lib/audit";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -16,16 +17,36 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  try {
-    await prisma.transaction.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "No se pudo eliminar" }, { status: 500 });
+
+  const tx = await prisma.transaction.findUnique({ where: { id } });
+  if (!tx) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (tx.ledgerStatus === "POSTED") {
+    return NextResponse.json(
+      { error: "Esta transacción está POSTED y no puede eliminarse. Usa Revertir." },
+      { status: 409 }
+    );
   }
+
+  await prisma.transaction.delete({ where: { id } });
+  await writeAudit({ prisma, entityType: "Transaction", entityId: id, action: "DELETE", oldData: tx });
+
+  return NextResponse.json({ ok: true });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+
+  const tx = await prisma.transaction.findUnique({ where: { id } });
+  if (!tx) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (tx.ledgerStatus === "POSTED") {
+    return NextResponse.json(
+      { error: "Esta transacción está POSTED. Para corregirla usa Revertir." },
+      { status: 409 }
+    );
+  }
+
   const body = await req.json();
   const { description, categoryName, date, notes } = body;
 
@@ -36,7 +57,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     categoryId = cat.id;
   }
 
-  const tx = await prisma.transaction.update({
+  const updated = await prisma.transaction.update({
     where: { id },
     data: {
       ...(description !== undefined && { description }),
@@ -49,5 +70,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       category: true,
     },
   });
-  return NextResponse.json(tx);
+
+  await writeAudit({ prisma, entityType: "Transaction", entityId: id, action: "UPDATE", oldData: tx, newData: updated });
+
+  return NextResponse.json(updated);
 }

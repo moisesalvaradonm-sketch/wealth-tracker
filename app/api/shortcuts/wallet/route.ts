@@ -1,17 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { TransactionType } from "@prisma/client";
 import { NextResponse } from "next/server";
+import Decimal from "decimal.js";
+import { buildJournalEntries, validateBalance, getSystemAccounts } from "@/lib/ledger";
 
-// Parses Apple Wallet notification text like:
-// "You spent $12.50 at Starbucks" or "Gastaste $12.50 en Starbucks"
 function parseWalletNotification(text: string): { amount: number; merchant: string } {
   const amountMatch = text.match(/\$\s*([\d,]+\.?\d*)/);
   const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, "")) : 0;
-
-  // English: "at Merchant" / Spanish: "en Merchant"
   const merchantMatch = text.match(/(?:\bat\s+|\ben\s+)(.+?)(?:\s*\.?\s*$)/i);
   const merchant = merchantMatch ? merchantMatch[1].trim() : "Apple Wallet";
-
   return { amount, merchant };
 }
 
@@ -45,7 +42,6 @@ export async function POST(req: Request) {
   }
 
   const { amount, merchant } = parseWalletNotification(text);
-
   if (amount <= 0) {
     return NextResponse.json({ error: `No encontré monto en: "${text}"` }, { status: 422 });
   }
@@ -54,38 +50,65 @@ export async function POST(req: Request) {
   const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
   const existingEntry = await prisma.transactionEntry.findFirst({
     where: {
-      amountUsd: -amount,
+      amountUsd: { lte: -(amount - 0.001), gte: -(amount + 0.001) },
       createdAt: { gte: threeMinutesAgo },
     },
     include: { transaction: true },
   });
   if (existingEntry) {
     return NextResponse.json({
-      ok: true,
-      duplicate: true,
+      ok: true, duplicate: true,
       message: `⚠️ Duplicado detectado — $${amount.toFixed(2)} ya registrado`,
       id: existingEntry.transaction.id,
     });
   }
 
   const account = await prisma.account.findFirst({
-    where: { isActive: true },
+    where: { isActive: true, includeInNetWorth: true, accountRole: { not: "VIRTUAL" } },
     orderBy: { createdAt: "asc" },
   });
-
   if (!account) {
     return NextResponse.json({ error: "Crea una cuenta primero en el app" }, { status: 422 });
   }
 
+  let systemAccounts: Awaited<ReturnType<typeof getSystemAccounts>>;
+  try {
+    systemAccounts = await getSystemAccounts(prisma);
+  } catch (e: unknown) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 503 });
+  }
+
   const asset = await getOrCreateUsdAsset();
+  const parsedAmount = new Decimal(amount);
+
+  const entries = buildJournalEntries({
+    txType: "EXPENSE",
+    amount: parsedAmount,
+    assetId: asset.id,
+    accountId: account.id,
+    systemIncomeAccountId: systemAccounts.income.id,
+    systemExpenseAccountId: systemAccounts.expense.id,
+  });
+
+  if (!validateBalance(entries)) {
+    return NextResponse.json({ error: "Error interno de balance" }, { status: 500 });
+  }
 
   const transaction = await prisma.transaction.create({
     data: {
       date: new Date(),
       description: merchant,
       txType: "EXPENSE" as TransactionType,
+      dataSource: "SHORTCUT_WALLET",
+      postedAt: new Date(),
       entries: {
-        create: [{ accountId: account.id, assetId: asset.id, amount: -amount, amountUsd: -amount }],
+        create: entries.map((e) => ({
+          accountId: e.accountId,
+          assetId: e.assetId,
+          amount: e.amount.toFixed(8),
+          amountUsd: e.amountUsd.toFixed(8),
+          sortOrder: e.sortOrder,
+        })),
       },
     },
   });

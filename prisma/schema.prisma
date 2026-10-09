@@ -9,6 +9,26 @@ datasource db {
 }
 
 // ─────────────────────────────────────────────
+// ENTITIES (Personal vs Business)
+// ─────────────────────────────────────────────
+
+model Entity {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  type      EntityType
+  accounts  Account[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("entities")
+}
+
+enum EntityType {
+  PERSONAL
+  BUSINESS
+}
+
+// ─────────────────────────────────────────────
 // INSTITUTIONS & ACCOUNTS
 // ─────────────────────────────────────────────
 
@@ -36,8 +56,10 @@ enum InstitutionType {
 model Account {
   id                String      @id @default(uuid())
   institutionId     String?
+  entityId          String?
   name              String
   accountType       AccountType
+  accountRole       AccountRole @default(ASSET)
   isActive          Boolean     @default(true)
   isManual          Boolean     @default(true)
   notes             String?
@@ -46,6 +68,7 @@ model Account {
   includeInNetWorth Boolean     @default(true)
 
   institution       Institution?        @relation(fields: [institutionId], references: [id])
+  entity            Entity?             @relation(fields: [entityId], references: [id])
   entries           TransactionEntry[]
   positions         Position[]
   createdAt         DateTime            @default(now())
@@ -63,6 +86,13 @@ enum AccountType {
   INVESTMENT
   CREDIT
   OTHER
+}
+
+enum AccountRole {
+  ASSET
+  LIABILITY
+  EQUITY
+  VIRTUAL
 }
 
 // ─────────────────────────────────────────────
@@ -118,16 +148,23 @@ model AssetPrice {
 // ─────────────────────────────────────────────
 
 model Transaction {
-  id           String            @id @default(uuid())
-  date         DateTime          @db.Date
-  description  String
-  txType       TransactionType
-  status       TransactionStatus @default(CONFIRMED)
-  notes        String?
-  externalId   String?
-  importSource String?
+  id            String            @id @default(uuid())
+  date          DateTime          @db.Date
+  description   String
+  txType        TransactionType
+  status        TransactionStatus @default(CONFIRMED)
+  ledgerStatus  LedgerStatus      @default(POSTED)
+  dataSource    DataSource        @default(MANUAL)
+  postedAt      DateTime?
+  reversalOfId  String?
+  externalRef   String?           @unique
+  notes         String?
+  externalId    String?
+  importSource  String?
   duplicateOfId String?
 
+  reversalOf   Transaction?       @relation("Reversals", fields: [reversalOfId], references: [id])
+  reversals    Transaction[]      @relation("Reversals")
   duplicateOf  Transaction?       @relation("Duplicates", fields: [duplicateOfId], references: [id])
   duplicates   Transaction[]      @relation("Duplicates")
   entries      TransactionEntry[]
@@ -139,6 +176,7 @@ model Transaction {
 
   @@index([date(sort: Desc)])
   @@index([txType])
+  @@index([ledgerStatus])
   @@map("transactions")
 }
 
@@ -160,6 +198,21 @@ enum TransactionStatus {
   PENDING
   CONFIRMED
   CANCELLED
+}
+
+enum LedgerStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum DataSource {
+  MANUAL
+  SHORTCUT_WALLET
+  SHORTCUT_VOICE
+  SHORTCUT_PHOTO
+  IMPORT_CSV
+  API
 }
 
 model TransactionEntry {

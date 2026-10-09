@@ -27,9 +27,12 @@ export default function NewTransactionPage() {
   const [accountId, setAccountId] = useState("");
   const [categoryName, setCategoryName] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [toAccountId, setToAccountId] = useState("");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const needsDest = ["TRANSFER", "INVESTMENT"].includes(txType);
 
   useEffect(() => {
     fetch("/api/accounts").then((r) => r.json()).then((data) => {
@@ -57,12 +60,13 @@ export default function NewTransactionPage() {
   async function handleSave() {
     if (!amount || parseFloat(amount) === 0) { setError("Ingresa un monto"); return; }
     if (!accountId) { setError("Selecciona una cuenta"); return; }
+    if (needsDest && !toAccountId) { setError("Selecciona cuenta destino"); return; }
     if (!description.trim()) { setError("Agrega una descripción"); return; }
     setSaving(true); setError("");
     const res = await fetch("/api/transactions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ txType, amount, accountId, description, date, categoryName }),
+      body: JSON.stringify({ txType, amount, accountId, toAccountId: needsDest ? toAccountId : undefined, description, date, categoryName }),
     });
     if (res.ok) {
       router.push("/transactions");
@@ -198,6 +202,26 @@ export default function NewTransactionPage() {
           >
             Primero crea una cuenta →
           </a>
+        )}
+
+        {/* Destination account (TRANSFER / INVESTMENT) */}
+        {needsDest && (
+          <select
+            value={toAccountId}
+            onChange={(e) => setToAccountId(e.target.value)}
+            style={{
+              background: "var(--surf)", border: "1px solid var(--border)",
+              borderRadius: 14, padding: "13px 16px",
+              color: toAccountId ? "var(--text)" : "var(--muted)",
+              fontSize: 15, outline: "none", width: "100%",
+              boxSizing: "border-box", appearance: "none",
+            }}
+          >
+            <option value="" disabled>Cuenta destino</option>
+            {accounts.filter((a) => a.id !== accountId).map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
         )}
 
         {/* Category */}
