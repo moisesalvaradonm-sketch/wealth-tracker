@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/api/") && isPublicApi) return NextResponse.next();
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  const valid = token ? validateSessionToken(token) : false;
+  const valid = token ? await validateSessionToken(token) : false;
 
   if (pathname.startsWith("/api/")) {
     if (!valid) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

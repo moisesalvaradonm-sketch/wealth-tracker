@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   let token: string;
   try {
-    token = createSessionToken();
+    token = await createSessionToken();
   } catch {
     return NextResponse.json(
       { error: "APP_SESSION_SECRET no configurado" },

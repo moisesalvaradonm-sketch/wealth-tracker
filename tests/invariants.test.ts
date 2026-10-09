@@ -158,21 +158,21 @@ describe("Invariant 11: session token is signed and verifiable", () => {
     process.env.APP_SESSION_SECRET = "test-secret-for-unit-tests-32chars!";
   });
 
-  it("creates and validates a token", () => {
-    const token = createSessionToken();
-    expect(validateSessionToken(token)).toBe(true);
+  it("creates and validates a token", async () => {
+    const token = await createSessionToken();
+    expect(await validateSessionToken(token)).toBe(true);
   });
 
-  it("rejects a tampered token", () => {
-    const token = createSessionToken();
+  it("rejects a tampered token", async () => {
+    const token = await createSessionToken();
     const parts = token.split(".");
     parts[1] = Buffer.from('{"iat":1,"jti":"tampered"}').toString("base64url");
-    expect(validateSessionToken(parts.join("."))).toBe(false);
+    expect(await validateSessionToken(parts.join("."))).toBe(false);
   });
 
-  it("rejects an old base64 token format", () => {
+  it("rejects an old base64 token format", async () => {
     const oldToken = Buffer.from("default-secret:1234567890").toString("base64");
-    expect(validateSessionToken(oldToken)).toBe(false);
+    expect(await validateSessionToken(oldToken)).toBe(false);
   });
 });
 
