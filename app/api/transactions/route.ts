@@ -18,11 +18,11 @@ async function getOrCreateUsdAsset() {
 export async function GET() {
   const transactions = await prisma.transaction.findMany({
     include: {
-      entries: { include: { account: true, asset: true } },
+      entries: { include: { account: { include: { entity: { select: { name: true } } } }, asset: true } },
       category: true,
     },
     orderBy: { date: "desc" },
-    take: 50,
+    take: 100,
   });
   return NextResponse.json(transactions);
 }

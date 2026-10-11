@@ -22,11 +22,14 @@ interface Transaction {
   txType: string;
   notes?: string;
   importSource?: string;
+  dataSource?: string;
+  externalRef?: string;
   category?: { name: string };
   entries: {
+    id: string;
     amount: string;
     amountUsd: string;
-    account: { name: string };
+    account: { name: string; entity?: { name: string } | null; accountRole?: string };
     asset: { symbol: string };
   }[];
 }
@@ -77,9 +80,12 @@ export default function TransactionDetailPage() {
   );
 
   const cfg = TYPE_CONFIG[tx.txType] ?? { label: tx.txType, color: "var(--muted)", emoji: "•" };
-  const entry = tx.entries[0];
+  const realEntries = tx.entries.filter((e) => e.account.accountRole !== "VIRTUAL");
+  const entry = realEntries[0] ?? tx.entries[0];
   const amount = entry ? parseFloat(entry.amount) : 0;
+  const entityName = entry?.account?.entity?.name;
   const dateStr = new Date(tx.date).toLocaleDateString("es-PA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const SOURCE_LABELS: Record<string, string> = { MANUAL: "Manual", SHORTCUT_VOICE: "Shortcut voz", SHORTCUT_WALLET: "Apple Wallet", IMPORT: "Importado" };
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
@@ -127,25 +133,56 @@ export default function TransactionDetailPage() {
       </div>
 
       {/* Details */}
-      <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 0 }}>
+      <div style={{ padding: "16px 20px 0", display: "flex", flexDirection: "column", gap: 0 }}>
         {[
           { label: "Fecha", value: dateStr },
           { label: "Cuenta", value: entry?.account.name ?? "—" },
+          ...(entityName ? [{ label: "Entidad", value: entityName }] : []),
           { label: "Categoría", value: tx.category?.name ?? "Sin categoría" },
-          { label: "Activo", value: entry?.asset.symbol ?? "USD" },
+          ...(tx.dataSource ? [{ label: "Origen", value: SOURCE_LABELS[tx.dataSource] ?? tx.dataSource }] : []),
           ...(tx.notes ? [{ label: "Notas", value: tx.notes }] : []),
-          ...(tx.importSource ? [{ label: "Origen", value: tx.importSource }] : []),
+          ...(tx.externalRef ? [{ label: "Ref", value: tx.externalRef }] : []),
         ].map((row, i, arr) => (
           <div key={row.label} style={{
             display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-            padding: "14px 0",
+            padding: "13px 0",
             borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none",
           }}>
             <span style={{ color: "var(--muted)", fontSize: 14 }}>{row.label}</span>
-            <span style={{ color: "var(--text)", fontSize: 14, fontWeight: 600, textAlign: "right", maxWidth: "60%" }}>{row.value}</span>
+            <span style={{ color: "var(--text)", fontSize: 14, fontWeight: 600, textAlign: "right", maxWidth: "65%" }}>{row.value}</span>
           </div>
         ))}
       </div>
+
+      {/* Journal entries */}
+      {tx.entries.length > 0 && (
+        <div style={{ padding: "16px 20px" }}>
+          <p style={{ color: "var(--muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 8px" }}>Asientos contables</p>
+          <div style={{ background: "var(--surf)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+            {tx.entries.map((e, i) => {
+              const n = Number(e.amountUsd);
+              const isLast = i === tx.entries.length - 1;
+              return (
+                <div key={e.id} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "10px 14px",
+                  borderBottom: isLast ? "none" : "1px solid var(--border)",
+                }}>
+                  <div>
+                    <p style={{ color: "var(--text)", fontSize: 12, fontWeight: 600, margin: 0 }}>{e.account.name}</p>
+                    {e.account.accountRole && (
+                      <p style={{ color: "var(--muted)", fontSize: 10, margin: 0 }}>{e.account.accountRole}</p>
+                    )}
+                  </div>
+                  <p style={{ color: n >= 0 ? "var(--green)" : "var(--red)", fontSize: 13, fontWeight: 700, margin: 0, fontVariantNumeric: "tabular-nums" }}>
+                    {n >= 0 ? "+" : ""}{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n)}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Delete confirm sheet */}
       {confirmDelete && (

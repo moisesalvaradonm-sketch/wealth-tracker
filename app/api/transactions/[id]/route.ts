@@ -7,7 +7,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const tx = await prisma.transaction.findUnique({
     where: { id },
     include: {
-      entries: { include: { account: true, asset: true } },
+      entries: { include: { account: { include: { entity: { select: { name: true } } } }, asset: true } },
       category: true,
     },
   });
