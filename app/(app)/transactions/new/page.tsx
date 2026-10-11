@@ -17,7 +17,7 @@ const CATEGORIES: Record<string, string[]> = {
   INVESTMENT: ["Acciones", "Cripto", "Fondo", "Inmueble", "Otro"],
 };
 
-interface Account { id: string; name: string; accountType: string; }
+interface Account { id: string; name: string; accountType: string; entity?: { name: string } | null; }
 
 export default function NewTransactionPage() {
   const router = useRouter();
@@ -186,7 +186,7 @@ export default function NewTransactionPage() {
         >
           <option value="" disabled>Selecciona una cuenta</option>
           {accounts.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
+            <option key={a.id} value={a.id}>{a.entity ? `${a.entity.name.split(" ")[0]} · ${a.name}` : a.name}</option>
           ))}
         </select>
 
@@ -219,7 +219,7 @@ export default function NewTransactionPage() {
           >
             <option value="" disabled>Cuenta destino</option>
             {accounts.filter((a) => a.id !== accountId).map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
+              <option key={a.id} value={a.id}>{a.entity ? `${a.entity.name.split(" ")[0]} · ${a.name}` : a.name}</option>
             ))}
           </select>
         )}

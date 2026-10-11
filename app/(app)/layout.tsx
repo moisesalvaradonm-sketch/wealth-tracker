@@ -3,10 +3,10 @@
 import { usePathname } from "next/navigation";
 
 const NAV = [
-  { href: "/dashboard",     label: "Inicio",      icon: HomeIcon },
-  { href: "/transactions",  label: "Actividad",   icon: ActivityIcon },
-  { href: "/accounts",      label: "Cuentas",     icon: WalletIcon },
-  { href: "/investments",   label: "Inversiones", icon: ChartIcon },
+  { href: "/dashboard",    label: "Inicio",    icon: HomeIcon },
+  { href: "/transactions", label: "Actividad", icon: ActivityIcon },
+  { href: "/accounts",     label: "Cuentas",   icon: WalletIcon },
+  { href: "/reports",      label: "Reporte",   icon: ChartIcon },
 ];
 
 function HomeIcon({ active }: { active?: boolean }) {

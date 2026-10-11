@@ -21,6 +21,7 @@ interface Account {
   color?: string;
   icon?: string;
   balance?: number;
+  entity?: { id: string; name: string } | null;
 }
 
 export default function AccountsPage() {
@@ -158,51 +159,67 @@ export default function AccountsPage() {
         </div>
       )}
 
-      {/* Account list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {accounts.map((acc) => {
-          const info = typeInfo(acc.accountType);
+      {/* Account list grouped by entity */}
+      {(() => {
+        const groups = new Map<string, Account[]>();
+        for (const acc of accounts) {
+          const key = acc.entity?.name ?? "Sin entidad";
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key)!.push(acc);
+        }
+        return Array.from(groups.entries()).map(([entityName, accs]) => {
+          const total = accs.reduce((s, a) => s + (a.balance ?? 0), 0);
           return (
-            <div key={acc.id} style={{
-              background: "var(--surf)", border: "1px solid var(--border)",
-              borderRadius: 18, padding: "16px",
-              display: "flex", alignItems: "center", gap: 14,
-            }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 14,
-                background: acc.color || "var(--surf2)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 20, flexShrink: 0,
-              }}>
-                {info?.icon}
-              </div>
-              <div style={{ flex: 1 }}>
-                <p style={{ color: "var(--text)", fontSize: 15, fontWeight: 700, margin: 0 }}>{acc.name}</p>
-                <p style={{ color: "var(--muted)", fontSize: 12, margin: "2px 0 0" }}>{info?.label}</p>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                <p style={{
-                  color: (acc.balance ?? 0) < 0 ? "var(--red)" : "var(--text)",
-                  fontSize: 16, fontWeight: 800, margin: 0,
-                  fontFamily: "var(--font-mono)",
-                }}>
-                  {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(acc.balance ?? 0)}
+            <div key={entityName} style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <p style={{ color: "var(--muted)", fontSize: 12, fontWeight: 700, margin: 0, textTransform: "uppercase", letterSpacing: 0.5 }}>{entityName}</p>
+                <p style={{ color: total < 0 ? "var(--red)" : "var(--text)", fontSize: 13, fontWeight: 800, margin: 0 }}>
+                  {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(total)}
                 </p>
-                <button
-                  onClick={() => { setAdjustAccount(acc); setAdjustAmount(String(acc.balance ?? 0)); }}
-                  style={{
-                    background: "none", border: "none",
-                    color: "var(--muted)", fontSize: 11, cursor: "pointer",
-                    padding: 0, fontWeight: 600,
-                  }}
-                >
-                  Ajustar
-                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {accs.map((acc) => {
+                  const info = typeInfo(acc.accountType);
+                  return (
+                    <div key={acc.id} style={{
+                      background: "var(--surf)", border: "1px solid var(--border)",
+                      borderRadius: 18, padding: "14px 16px",
+                      display: "flex", alignItems: "center", gap: 14,
+                    }}>
+                      <div style={{
+                        width: 42, height: 42, borderRadius: 13,
+                        background: acc.color || "#58a6ff",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 19, flexShrink: 0, opacity: 0.9,
+                      }}>
+                        {info?.icon}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ color: "var(--text)", fontSize: 14, fontWeight: 700, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{acc.name}</p>
+                        <p style={{ color: "var(--muted)", fontSize: 11, margin: "2px 0 0" }}>{info?.label}</p>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                        <p style={{
+                          color: (acc.balance ?? 0) < 0 ? "var(--red)" : "var(--text)",
+                          fontSize: 15, fontWeight: 800, margin: 0, fontVariantNumeric: "tabular-nums",
+                        }}>
+                          {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(acc.balance ?? 0)}
+                        </p>
+                        <button
+                          onClick={() => { setAdjustAccount(acc); setAdjustAmount(String(acc.balance ?? 0)); }}
+                          style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 11, cursor: "pointer", padding: 0, fontWeight: 600 }}
+                        >
+                          Ajustar
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
-        })}
-      </div>
+        });
+      })()}
 
       {/* Adjust balance sheet */}
       {adjustAccount && (
