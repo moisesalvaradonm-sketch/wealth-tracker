@@ -15,14 +15,19 @@ async function getOrCreateUsdAsset() {
   return asset;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const accountId = url.searchParams.get("accountId");
   const transactions = await prisma.transaction.findMany({
+    where: accountId
+      ? { entries: { some: { accountId } } }
+      : undefined,
     include: {
       entries: { include: { account: { include: { entity: { select: { name: true } } } }, asset: true } },
       category: true,
     },
     orderBy: { date: "desc" },
-    take: 100,
+    take: 200,
   });
   return NextResponse.json(transactions);
 }

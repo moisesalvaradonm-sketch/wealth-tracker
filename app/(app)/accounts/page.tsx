@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const ACCOUNT_TYPES = [
   { value: "CHECKING", label: "Cuenta corriente", icon: "🏦" },
@@ -25,6 +26,7 @@ interface Account {
 }
 
 export default function AccountsPage() {
+  const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -181,11 +183,14 @@ export default function AccountsPage() {
                 {accs.map((acc) => {
                   const info = typeInfo(acc.accountType);
                   return (
-                    <div key={acc.id} style={{
-                      background: "var(--surf)", border: "1px solid var(--border)",
-                      borderRadius: 18, padding: "14px 16px",
-                      display: "flex", alignItems: "center", gap: 14,
-                    }}>
+                    <div key={acc.id}
+                      onClick={() => router.push(`/accounts/${acc.id}`)}
+                      style={{
+                        background: "var(--surf)", border: "1px solid var(--border)",
+                        borderRadius: 18, padding: "14px 16px",
+                        display: "flex", alignItems: "center", gap: 14,
+                        cursor: "pointer",
+                      }}>
                       <div style={{
                         width: 42, height: 42, borderRadius: 13,
                         background: acc.color || "#58a6ff",
