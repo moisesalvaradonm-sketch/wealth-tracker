@@ -22,21 +22,13 @@ async function getOrCreateUsdAsset() {
   return asset;
 }
 
-export async function POST(req: Request) {
+async function handleWallet(req: Request, text: string | null, accountName: string | null) {
   const secret = req.headers.get("x-shortcuts-secret");
   const expected = process.env.SHORTCUTS_SECRET;
   if (!expected || secret !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { text?: string; accountName?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const { text, accountName } = body;
   if (!text?.trim()) {
     return NextResponse.json({ error: "Texto vacío" }, { status: 400 });
   }
@@ -125,4 +117,19 @@ export async function POST(req: Request) {
     message: `✅ $${amount.toFixed(2)} en ${merchant}`,
     id: transaction.id,
   }, { status: 201 });
+}
+
+// GET: /api/shortcuts/wallet?text=...&account=...
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const text = url.searchParams.get("text");
+  const accountName = url.searchParams.get("account");
+  return handleWallet(req, text, accountName);
+}
+
+// POST: { text, accountName }
+export async function POST(req: Request) {
+  let body: { text?: string; accountName?: string } = {};
+  try { body = await req.json(); } catch { /* ignore */ }
+  return handleWallet(req, body.text ?? null, body.accountName ?? null);
 }
