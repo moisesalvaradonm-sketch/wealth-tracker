@@ -7,20 +7,42 @@ function fmt(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
 }
 
-export default async function ReportsPage() {
+function parseMonth(monthParam: string | undefined): { year: number; month: number } {
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const [y, m] = monthParam.split("-").map(Number);
+    if (m >= 1 && m <= 12) return { year: y, month: m - 1 };
+  }
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+  return { year: now.getFullYear(), month: now.getMonth() };
+}
 
-  // This month
+function offsetMonth(year: number, month: number, delta: number): string {
+  const d = new Date(year, month + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+  const sp = await searchParams;
+  const { year, month } = parseMonth(sp.month);
+
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0, 23, 59, 59);
+  const prevMonthStart = new Date(year, month - 1, 1);
+  const prevMonthEnd = new Date(year, month, 0, 23, 59, 59);
+
+  const now = new Date();
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+  const prevSlug = offsetMonth(year, month, -1);
+  const nextSlug = offsetMonth(year, month, 1);
+  const isNextFuture = new Date(year, month + 1, 1) > now;
+
   const [thisExp, thisInc, prevExp, prevInc] = await Promise.all([
     prisma.transactionEntry.aggregate({
-      where: { amountUsd: { lt: 0 }, account: { accountRole: { not: "VIRTUAL" }, isActive: true }, createdAt: { gte: monthStart } },
+      where: { amountUsd: { lt: 0 }, account: { accountRole: { not: "VIRTUAL" }, isActive: true }, createdAt: { gte: monthStart, lte: monthEnd } },
       _sum: { amountUsd: true },
     }),
     prisma.transactionEntry.aggregate({
-      where: { amountUsd: { gt: 0 }, account: { accountRole: { not: "VIRTUAL" }, isActive: true }, createdAt: { gte: monthStart } },
+      where: { amountUsd: { gt: 0 }, account: { accountRole: { not: "VIRTUAL" }, isActive: true }, createdAt: { gte: monthStart, lte: monthEnd } },
       _sum: { amountUsd: true },
     }),
     prisma.transactionEntry.aggregate({
@@ -38,9 +60,8 @@ export default async function ReportsPage() {
   const prevMonthExp = Math.abs(Number(prevExp._sum.amountUsd ?? 0));
   const prevMonthInc = Number(prevInc._sum.amountUsd ?? 0);
 
-  // Category breakdown this month (expenses)
   const txThisMonth = await prisma.transaction.findMany({
-    where: { date: { gte: monthStart }, txType: { in: ["EXPENSE", "FEE"] } },
+    where: { date: { gte: monthStart, lte: monthEnd }, txType: { in: ["EXPENSE", "FEE"] } },
     include: {
       category: { select: { name: true } },
       entries: {
@@ -59,20 +80,18 @@ export default async function ReportsPage() {
   const categories = Array.from(catMap.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);
-
   const maxCat = categories[0]?.[1] ?? 1;
 
-  // Per-entity this month
   const entities = await prisma.entity.findMany({ orderBy: { name: "asc" } });
   const entityStats = await Promise.all(
     entities.map(async (e) => {
       const [exp, inc] = await Promise.all([
         prisma.transactionEntry.aggregate({
-          where: { amountUsd: { lt: 0 }, account: { entityId: e.id, accountRole: { not: "VIRTUAL" }, isActive: true }, createdAt: { gte: monthStart } },
+          where: { amountUsd: { lt: 0 }, account: { entityId: e.id, accountRole: { not: "VIRTUAL" }, isActive: true }, createdAt: { gte: monthStart, lte: monthEnd } },
           _sum: { amountUsd: true },
         }),
         prisma.transactionEntry.aggregate({
-          where: { amountUsd: { gt: 0 }, account: { entityId: e.id, accountRole: { not: "VIRTUAL" }, isActive: true }, createdAt: { gte: monthStart } },
+          where: { amountUsd: { gt: 0 }, account: { entityId: e.id, accountRole: { not: "VIRTUAL" }, isActive: true }, createdAt: { gte: monthStart, lte: monthEnd } },
           _sum: { amountUsd: true },
         }),
       ]);
@@ -84,21 +103,49 @@ export default async function ReportsPage() {
     })
   );
 
-  const thisMonthName = now.toLocaleDateString("es-PA", { month: "long" });
-  const prevMonthName = new Date(prevMonthStart).toLocaleDateString("es-PA", { month: "long" });
+  const thisMonthName = new Date(year, month, 1).toLocaleDateString("es-PA", { month: "long" });
+  const prevMonthName = new Date(year, month - 1, 1).toLocaleDateString("es-PA", { month: "long" });
   const expDiff = thisMonthExp - prevMonthExp;
   const incDiff = thisMonthInc - prevMonthInc;
 
   return (
     <div style={{ background: "var(--bg)", minHeight: "100%", paddingBottom: 100 }}>
       <div style={{ padding: "20px 20px 0" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-          <Link href="/dashboard" style={{ color: "var(--muted)", fontSize: 22, textDecoration: "none", lineHeight: 1 }}>←</Link>
-          <div>
+
+        {/* Header with month navigation */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+          <Link href="/dashboard" style={{ color: "var(--muted)", fontSize: 22, textDecoration: "none", lineHeight: 1, flexShrink: 0 }}>←</Link>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <h1 style={{ color: "var(--text)", fontSize: 20, fontWeight: 800, margin: 0 }}>Reporte mensual</h1>
-            <p style={{ color: "var(--muted)", fontSize: 13, margin: 0, textTransform: "capitalize" }}>{thisMonthName} {now.getFullYear()}</p>
+          </div>
+          {/* Month nav */}
+          <div style={{ display: "flex", alignItems: "center", gap: 0, background: "var(--surf)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", flexShrink: 0 }}>
+            <Link
+              href={`/reports?month=${prevSlug}`}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, color: "var(--muted)", textDecoration: "none", fontSize: 16, fontWeight: 700 }}
+            >
+              ‹
+            </Link>
+            <span style={{ color: "var(--text)", fontSize: 12, fontWeight: 700, textTransform: "capitalize", padding: "0 6px", whiteSpace: "nowrap" }}>
+              {thisMonthName} {year}
+            </span>
+            <Link
+              href={isNextFuture ? "#" : `/reports?month=${nextSlug}`}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36,
+                color: isNextFuture ? "var(--border)" : "var(--muted)",
+                textDecoration: "none", fontSize: 16, fontWeight: 700,
+                pointerEvents: isNextFuture ? "none" : "auto",
+              }}
+            >
+              ›
+            </Link>
           </div>
         </div>
+
+        {isCurrentMonth && (
+          <p style={{ color: "var(--muted)", fontSize: 12, margin: "-16px 0 16px", fontStyle: "italic" }}>Mes en curso · datos parciales</p>
+        )}
 
         {/* This month vs last month */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
@@ -122,13 +169,10 @@ export default async function ReportsPage() {
           </div>
         </div>
 
-        {/* Net this month */}
+        {/* Net */}
         <div style={{ background: "var(--surf)", border: "1px solid var(--border)", borderRadius: 18, padding: "16px 20px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <p style={{ color: "var(--muted)", fontSize: 13, fontWeight: 600, margin: 0 }}>Flujo neto {thisMonthName}</p>
-          <p style={{
-            color: (thisMonthInc - thisMonthExp) >= 0 ? "var(--green)" : "var(--red)",
-            fontSize: 20, fontWeight: 800, margin: 0,
-          }}>
+          <p style={{ color: "var(--muted)", fontSize: 13, fontWeight: 600, margin: 0, textTransform: "capitalize" }}>Flujo neto · {thisMonthName}</p>
+          <p style={{ color: (thisMonthInc - thisMonthExp) >= 0 ? "var(--green)" : "var(--red)", fontSize: 20, fontWeight: 800, margin: 0 }}>
             {fmt(thisMonthInc - thisMonthExp)}
           </p>
         </div>

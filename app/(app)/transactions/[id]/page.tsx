@@ -34,6 +34,14 @@ interface Transaction {
   }[];
 }
 
+const inputStyle = {
+  width: "100%", boxSizing: "border-box" as const,
+  background: "var(--surf2)", border: "1px solid var(--border)",
+  borderRadius: 10, padding: "10px 12px",
+  color: "var(--text)", fontSize: 14, outline: "none",
+  fontFamily: "inherit",
+};
+
 export default function TransactionDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -44,12 +52,61 @@ export default function TransactionDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+
   useEffect(() => {
     fetch(`/api/transactions/${id}`)
       .then((r) => r.json())
       .then((data) => { setTx(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [id]);
+
+  function startEdit() {
+    if (!tx) return;
+    setEditDescription(tx.description);
+    setEditCategory(tx.category?.name ?? "");
+    setEditDate(tx.date.slice(0, 10));
+    setEditNotes(tx.notes ?? "");
+    setEditError("");
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setEditError("");
+  }
+
+  async function handleSave() {
+    if (!editDescription.trim()) { setEditError("La descripción es requerida"); return; }
+    setSaving(true);
+    setEditError("");
+    const res = await fetch(`/api/transactions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        description: editDescription.trim(),
+        categoryName: editCategory.trim() || undefined,
+        date: editDate || undefined,
+        notes: editNotes.trim() || undefined,
+      }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setTx(updated);
+      setEditing(false);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setEditError(err.error ?? "Error al guardar");
+    }
+    setSaving(false);
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -86,6 +143,7 @@ export default function TransactionDetailPage() {
   const entityName = entry?.account?.entity?.name;
   const dateStr = new Date(tx.date).toLocaleDateString("es-PA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   const SOURCE_LABELS: Record<string, string> = { MANUAL: "Manual", SHORTCUT_VOICE: "Shortcut voz", SHORTCUT_WALLET: "Apple Wallet", IMPORT: "Importado" };
+  const isPosted = (tx as { ledgerStatus?: string }).ledgerStatus === "POSTED";
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
@@ -97,18 +155,39 @@ export default function TransactionDetailPage() {
         borderBottom: "1px solid var(--border)",
       }}>
         <button
-          onClick={() => router.back()}
+          onClick={() => editing ? cancelEdit() : router.back()}
           style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 22, cursor: "pointer", lineHeight: 1 }}
         >
-          ←
+          {editing ? "✕" : "←"}
         </button>
-        <h2 style={{ color: "var(--text)", fontSize: 17, fontWeight: 800, margin: 0, flex: 1 }}>Detalle</h2>
-        <button
-          onClick={() => setConfirmDelete(true)}
-          style={{ background: "none", border: "none", color: "var(--red)", fontSize: 20, cursor: "pointer", lineHeight: 1 }}
-        >
-          🗑
-        </button>
+        <h2 style={{ color: "var(--text)", fontSize: 17, fontWeight: 800, margin: 0, flex: 1 }}>
+          {editing ? "Editar" : "Detalle"}
+        </h2>
+        {!editing && !isPosted && (
+          <button
+            onClick={startEdit}
+            style={{ background: "none", border: "none", color: "var(--blue)", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+          >
+            Editar
+          </button>
+        )}
+        {!editing && (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{ background: "none", border: "none", color: "var(--red)", fontSize: 20, cursor: "pointer", lineHeight: 1 }}
+          >
+            🗑
+          </button>
+        )}
+        {editing && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{ background: "#1e88e5", border: "none", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", padding: "8px 16px", opacity: saving ? 0.7 : 1 }}
+          >
+            {saving ? "…" : "Guardar"}
+          </button>
+        )}
       </div>
 
       {/* Hero */}
@@ -129,33 +208,88 @@ export default function TransactionDetailPage() {
         }}>
           {amount >= 0 ? "+" : ""}{fmt(amount)}
         </p>
-        <p style={{ color: "var(--text)", fontSize: 15, fontWeight: 600, margin: 0 }}>{tx.description}</p>
+        {editing ? (
+          <input
+            value={editDescription}
+            onChange={(e) => setEditDescription(e.target.value)}
+            style={{ ...inputStyle, textAlign: "center", fontSize: 15, fontWeight: 600 }}
+            placeholder="Descripción"
+          />
+        ) : (
+          <p style={{ color: "var(--text)", fontSize: 15, fontWeight: 600, margin: 0 }}>{tx.description}</p>
+        )}
       </div>
 
-      {/* Details */}
-      <div style={{ padding: "16px 20px 0", display: "flex", flexDirection: "column", gap: 0 }}>
-        {[
-          { label: "Fecha", value: dateStr },
-          { label: "Cuenta", value: entry?.account.name ?? "—" },
-          ...(entityName ? [{ label: "Entidad", value: entityName }] : []),
-          { label: "Categoría", value: tx.category?.name ?? "Sin categoría" },
-          ...(tx.dataSource ? [{ label: "Origen", value: SOURCE_LABELS[tx.dataSource] ?? tx.dataSource }] : []),
-          ...(tx.notes ? [{ label: "Notas", value: tx.notes }] : []),
-          ...(tx.externalRef ? [{ label: "Ref", value: tx.externalRef }] : []),
-        ].map((row, i, arr) => (
-          <div key={row.label} style={{
-            display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-            padding: "13px 0",
-            borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none",
-          }}>
-            <span style={{ color: "var(--muted)", fontSize: 14 }}>{row.label}</span>
-            <span style={{ color: "var(--text)", fontSize: 14, fontWeight: 600, textAlign: "right", maxWidth: "65%" }}>{row.value}</span>
+      {/* Edit error */}
+      {editError && (
+        <p style={{ color: "var(--red)", fontSize: 13, fontWeight: 600, margin: "10px 20px 0", textAlign: "center" }}>{editError}</p>
+      )}
+
+      {/* Edit fields */}
+      {editing && (
+        <div style={{ padding: "16px 20px 0", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <p style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, margin: "0 0 6px" }}>Categoría</p>
+            <input
+              value={editCategory}
+              onChange={(e) => setEditCategory(e.target.value)}
+              style={inputStyle}
+              placeholder="Ej: Restaurantes, Transporte…"
+            />
           </div>
-        ))}
-      </div>
+          <div>
+            <p style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, margin: "0 0 6px" }}>Fecha</p>
+            <input
+              type="date"
+              value={editDate}
+              onChange={(e) => setEditDate(e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <p style={{ color: "var(--muted)", fontSize: 12, fontWeight: 600, margin: "0 0 6px" }}>Notas</p>
+            <textarea
+              value={editNotes}
+              onChange={(e) => setEditNotes(e.target.value)}
+              rows={3}
+              style={{ ...inputStyle, resize: "vertical" }}
+              placeholder="Notas opcionales…"
+            />
+          </div>
+          {isPosted && (
+            <p style={{ color: "var(--muted)", fontSize: 12, textAlign: "center", fontStyle: "italic" }}>
+              Esta transacción está POSTED — solo se pueden editar metadatos
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Details (read mode) */}
+      {!editing && (
+        <div style={{ padding: "16px 20px 0", display: "flex", flexDirection: "column", gap: 0 }}>
+          {[
+            { label: "Fecha", value: dateStr },
+            { label: "Cuenta", value: entry?.account.name ?? "—" },
+            ...(entityName ? [{ label: "Entidad", value: entityName }] : []),
+            { label: "Categoría", value: tx.category?.name ?? "Sin categoría" },
+            ...(tx.dataSource ? [{ label: "Origen", value: SOURCE_LABELS[tx.dataSource] ?? tx.dataSource }] : []),
+            ...(tx.notes ? [{ label: "Notas", value: tx.notes }] : []),
+            ...(tx.externalRef ? [{ label: "Ref", value: tx.externalRef }] : []),
+          ].map((row, i, arr) => (
+            <div key={row.label} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+              padding: "13px 0",
+              borderBottom: i < arr.length - 1 ? "1px solid var(--border)" : "none",
+            }}>
+              <span style={{ color: "var(--muted)", fontSize: 14 }}>{row.label}</span>
+              <span style={{ color: "var(--text)", fontSize: 14, fontWeight: 600, textAlign: "right", maxWidth: "65%" }}>{row.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Journal entries */}
-      {tx.entries.length > 0 && (
+      {!editing && tx.entries.length > 0 && (
         <div style={{ padding: "16px 20px" }}>
           <p style={{ color: "var(--muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, margin: "0 0 8px" }}>Asientos contables</p>
           <div style={{ background: "var(--surf)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
