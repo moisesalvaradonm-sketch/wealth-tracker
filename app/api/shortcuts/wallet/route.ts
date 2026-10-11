@@ -22,18 +22,27 @@ async function getOrCreateUsdAsset() {
   return asset;
 }
 
-async function handleWallet(req: Request, text: string | null, accountName: string | null) {
+async function handleWallet(req: Request, text: string | null, accountName: string | null, amountParam: string | null, merchantParam: string | null) {
   const secret = req.headers.get("x-shortcuts-secret");
   const expected = process.env.SHORTCUTS_SECRET;
   if (!expected || secret !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!text?.trim()) {
-    return NextResponse.json({ error: "Texto vacío" }, { status: 400 });
-  }
+  let amount: number;
+  let merchant: string;
 
-  const { amount, merchant } = parseWalletNotification(text);
+  if (amountParam) {
+    // Direct params — no parsing needed
+    amount = parseFloat(amountParam.replace(/[^0-9.]/g, ""));
+    merchant = merchantParam?.trim() || "Apple Wallet";
+  } else if (text?.trim()) {
+    const parsed = parseWalletNotification(text);
+    amount = parsed.amount;
+    merchant = parsed.merchant;
+  } else {
+    return NextResponse.json({ error: "Proporciona amount o text" }, { status: 400 });
+  }
   if (amount <= 0) {
     return NextResponse.json({ error: `No encontré monto en: "${text}"` }, { status: 422 });
   }
@@ -119,17 +128,20 @@ async function handleWallet(req: Request, text: string | null, accountName: stri
   }, { status: 201 });
 }
 
-// GET: /api/shortcuts/wallet?text=...&account=...
+// GET: ?amount=25.50&merchant=Starbucks&account=...
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const text = url.searchParams.get("text");
-  const accountName = url.searchParams.get("account");
-  return handleWallet(req, text, accountName);
+  return handleWallet(req,
+    url.searchParams.get("text"),
+    url.searchParams.get("account"),
+    url.searchParams.get("amount"),
+    url.searchParams.get("merchant"),
+  );
 }
 
-// POST: { text, accountName }
+// POST: { text?, amount?, merchant?, accountName? }
 export async function POST(req: Request) {
-  let body: { text?: string; accountName?: string } = {};
+  let body: { text?: string; accountName?: string; amount?: string; merchant?: string } = {};
   try { body = await req.json(); } catch { /* ignore */ }
-  return handleWallet(req, body.text ?? null, body.accountName ?? null);
+  return handleWallet(req, body.text ?? null, body.accountName ?? null, body.amount ?? null, body.merchant ?? null);
 }
